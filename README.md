@@ -1,2 +1,2 @@
 # caso-practico-2
-Despliegue de una aplicació sobre un proveedor de Cloud mediante el uso de herramientas DevOp
+Despliegue de una aplicación sobre un proveedor de Cloud mediante el uso de herramientas DevOp
