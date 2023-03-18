@@ -64,7 +64,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
     caching              = "ReadWrite"
     storage_account_type = "Standard_LRS"
   }
-  
+
   source_image_reference {
     publisher = "Canonical"
     offer     = "UbuntuServer"
@@ -117,4 +117,56 @@ resource "azurerm_network_security_rule" "http" {
   destination_address_prefix  = "*"
   resource_group_name         = azurerm_resource_group.rg.name
   network_security_group_name = azurerm_network_security_group.nsg.name
+}
+
+# Container registry con autenticacion
+resource "azurerm_container_registry" "acr" {
+  name                = "acredison"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  sku                 = "Basic"
+  admin_enabled       = true
+}
+
+# Creando un AKS cluster
+resource "azurerm_kubernetes_cluster" "akc" {
+  name                = "akc1"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  kubernetes_version  = "1.26.0"
+  dns_prefix          = "akcdns1"
+
+  linux_profile {
+    admin_username = "azureuser"
+
+    ssh_key {
+      key_data = file("C:/Users/ediso/.ssh/id_rsa.pub")
+    }
+  }
+
+  default_node_pool {
+    name       = "default"
+    node_count = 1
+    vm_size    = "Standard_D2_v2"
+  }
+
+  # Azure asignará el identificador automáticamente
+  identity {
+    type = "SystemAssigned"
+  }
+}
+
+# Agregar el rol AcrPull al clúster para que pueda extraer imágenes del ACR
+resource "azurerm_role_assignment" "ara" {
+  principal_id                     = azurerm_kubernetes_cluster.akc.kubelet_identity[0].object_id
+  role_definition_name             = "AcrPull"
+  scope                            = azurerm_container_registry.acr.id
+  skip_service_principal_aad_check = true
+}
+
+# Guardar el archivo kube.conf para que podamos conectarnos con kubectl
+resource "local_file" "kubeconfig" {
+  depends_on = [azurerm_kubernetes_cluster.akc]
+  filename   = "kube.conf"
+  content    = azurerm_kubernetes_cluster.akc.kube_config_raw
 }
