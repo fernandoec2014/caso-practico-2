@@ -49,7 +49,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   name                = "vm1"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
-  size                = "Standard_DS1_v2"
+  size                = "Standard_F2"
   admin_username      = "azureuser"
   network_interface_ids = [
     azurerm_network_interface.nic.id,
@@ -64,19 +64,19 @@ resource "azurerm_linux_virtual_machine" "vm" {
     caching              = "ReadWrite"
     storage_account_type = "Standard_LRS"
   }
-
-  plan {
-    name      = "CentOS"
-    product   = "CentOS"
-    publisher = "OpenLogic"
-  }
-
+  
   source_image_reference {
-    publisher = "OpenLogic"
-    offer     = "CentOS"
-    sku       = "7.5"
+    publisher = "Canonical"
+    offer     = "UbuntuServer"
+    sku       = "16.04-LTS"
     version   = "latest"
   }
+}
+
+resource "azurerm_marketplace_agreement" "centos" {
+  publisher = "cognosys"
+  offer     = "centos-8-stream-free"
+  plan      = "Basic"
 }
 
 # Crear grupo de seguridad
