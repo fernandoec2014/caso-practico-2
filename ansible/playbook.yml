@@ -2,8 +2,8 @@
 # Playbook
 # ###########################
 
-- name: Webserver playbook
-  hosts: localhost
+- name: Playbook app web
+  hosts: Ubuntu
   remote_user: edison
   become: true
 
@@ -28,3 +28,121 @@
         name: apache2
         state: present
 
+    - name: 'Instalar python passlib'
+      become: true
+      become_user: root
+      become_method: sudo
+      ansible.builtin.pip:
+        name: passlib
+    
+    - name: Crear un directorio
+      ansible.builtin.file:
+        path: "/workspace"
+        state: directory
+
+    - name: Fichero de credenciales para autenticacion
+      community.general.htpasswd:
+        path: "workspace/.creds"
+        name: "admin"
+        password: "password"
+
+    - name: Página principal del servidor Web
+      ansible.builtin.copy:
+        src: ./files/index.html
+        dest: "workspace/index.html"
+
+    - name: Configuración servidor web
+      ansible.builtin.copy:
+        src: ./files/httpd.conf
+        dest: "workspace/httpd.conf"
+
+    - name: Configurar autenticación
+      ansible.builtin.copy:
+        src: ./files/.htaccess
+        dest: "workspace/.htaccess"
+
+    - name: Crear la imagen del contenedor
+      ansible.builtin.copy:
+        src: ./files/Containerfile
+        dest: "workspace/Containerfile"
+
+    - name: Generar la imagen del contenedor
+      become: true
+      become_user: root
+      become_method: sudo
+      containers.podman.podman_image:
+        name: webserver
+        path: "workspace"
+
+    - name: Etiquetar la imagen del contenedor
+      become: true
+      become_user: root
+      become_method: sudo
+      containers.podman.podman_tag:
+        image: localhost/webserver:latest
+        target_names:
+          - "acredison.azurecr.io/webserver:casopractico2"
+
+    - name: Autenticarse en el Registry de Azure
+      become: true
+      become_user: root
+      become_method: sudo
+      containers.podman.podman_login:
+        username: 
+        password: 
+        registry: "acredison.azurecr.io"
+
+    - name: Subir la imagen del contenedor
+      become: true
+      become_user: root
+      become_method: sudo
+      containers.podman.podman_image:
+        name: "acredison.azurecr.io/webserver:casopractico2"
+        push: yes
+        push_args:
+          dest: "acredison.azurecr.io/webserver:casopractico2"
+
+    - name: Crear el contenedor desde la imagen Azure Registry
+      become: true
+      become_user: root
+      become_method: sudo
+      containers.podman.podman_container:
+        name: "app"
+        image: "acredison.azurecr.io/webserver:casopractico2"
+        state: created
+        ports:
+          - "8080:443"
+
+    - name: Generar los ficheros para gestionar a través de systemd
+      become: true
+      become_user: root
+      become_method: sudo
+      containers.podman.podman_generate_systemd:
+          name: "app"
+          new: true
+          dest: "workspace"
+
+    - name: Copiar los ficheros al directorio de systemd
+      become: true
+      become_user: root
+      become_method: sudo
+      ansible.builtin.copy:
+        remote_src: true
+        src: "workspace/container-app.service"
+        dest: "/etc/systemd/system/container-app.service"
+
+    - name: Cargar configuración de systemd
+      become: true
+      become_user: root
+      become_method: sudo
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Iniciar la aplicación Web desde systemd
+      become: true
+      become_user: root
+      become_method: sudo
+      ansible.builtin.systemd:
+        name: "container-app.service"
+        enabled: true
+        state: started
