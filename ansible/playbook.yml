@@ -4,7 +4,7 @@
 
 - name: Playbook app web
   hosts: Ubuntu
-  remote_user: edison
+  remote_user: 20.90.251.83
   become: true
 
   tasks:
